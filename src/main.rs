@@ -1,8 +1,8 @@
 use clap::{App, Arg};
-use image::{DynamicImage, GenericImageView, Pixel};
-use plotters::prelude::*;
+use image::{DynamicImage, GenericImageView};
+use std::ops::Neg;
 
-const OUT_FILE_NAME: &'static str = "plotters-doc-data/snowflake.png";
+//const OUT_FILE_NAME: &str = "plotters-doc-data/snowflake.png";
 fn main() {
     let matches = App::new("drawlings")
         .version("1.0")
@@ -34,17 +34,18 @@ fn main() {
 
     // You can see how many times a particular flag or argument occurred
     // Note, only flags can have multiple occurrences
-    let verbose = matches.occurrences_of("v");
+    let _verbose = matches.occurrences_of("v");
 
     // You can check for the existence of subcommands, and if found use their
     // matches just as you would the top level app
-    if let Some(ref matches) = matches.subcommand_matches("vector_dump") {
-        let img = image::open("tests/images/jpg/progressive/cat.jpg").expect("could not open file");
+    if let Some(_matches) = matches.subcommand_matches("vector_dump") {
+        let img = image::open(input).expect("could not open file");
         let vecs = generator_vec(&img);
+        dbg!(vecs);
     }
 }
 
-#[derive(Default, Clone, Copy, PartialEq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 struct Point {
     x: i32,
     y: i32,
@@ -61,25 +62,27 @@ fn generator_vec(img: &DynamicImage) -> Vec<Point> {
     let direction_change = vec![
         (pixel_movement, 0),
         (pixel_movement, pixel_movement),
-        (-1 * pixel_movement, 0),
-        (-1 * pixel_movement, -1 * pixel_movement),
+        (pixel_movement.neg(), 0),
+        (pixel_movement.neg(), pixel_movement.neg()),
     ];
 
-    let black_pixel = image::Rgba([0, 0, 0, 0]);
+    let black_pixel = image::Rgba([0, 0, 0, 255]);
 
     let (img_x, img_y) = img.dimensions();
 
     // off by 1 for odd size images
-    let middle = Point {
+    let _middle = Point {
         x: (img_x / 2) as i32,
         y: (img_y / 2) as i32,
     };
 
-    let mut first_spot = first_spot(&img);
+    dbg!("here");
+    let first_spot = first_spot(img);
 
+    dbg!(&first_spot);
     let mut current_spot = first_spot.expect("no black pixels located");
     let first_spot = first_spot.unwrap();
-    return_points.push(current_spot.clone());
+    return_points.push(current_spot);
     'main_loop: loop {
         let mut next = None;
         'top_loop: for direct in &direction_change {
@@ -90,7 +93,7 @@ fn generator_vec(img: &DynamicImage) -> Vec<Point> {
                 y: move_y,
             };
             if return_points.last().unwrap() == &point {
-                next;
+                continue;
             }
 
             let pixel = img.get_pixel(move_x as u32, move_y as u32);
@@ -100,9 +103,12 @@ fn generator_vec(img: &DynamicImage) -> Vec<Point> {
             }
         }
         current_spot = next.expect("No next black pixel found");
-        return_points.push(current_spot.clone());
+        dbg!(&return_points);
+        return_points.push(current_spot);
         // dont check until we are far from the start
-        if return_points.len() > 10 && at_the_start(&current_spot, &first_spot) {
+        if return_points.len() > 10 && at_the_start(&current_spot, &first_spot)
+            || return_points.len() > 100_000
+        {
             break 'main_loop;
         }
     }
@@ -113,10 +119,9 @@ fn generator_vec(img: &DynamicImage) -> Vec<Point> {
 // but this was easier to reason about..
 fn first_spot(img: &DynamicImage) -> Option<Point> {
     let (img_x, img_y) = img.dimensions();
+
     let mut first_spot = None;
-    let mut x = 0;
-    let mut y = 0;
-    let black_pixel = image::Rgba([0, 0, 0, 0]);
+    let black_pixel = image::Rgba([0, 0, 0, 255]);
     'top_loop: while first_spot.is_none() {
         for move_x in 0..img_x {
             for move_y in 0..img_y {
@@ -135,7 +140,7 @@ fn first_spot(img: &DynamicImage) -> Option<Point> {
 }
 // let there be some buffer if we are back to the start.
 fn at_the_start(current: &Point, start: &Point) -> bool {
-    false
+    (current.x - start.x).abs() < 10 && (current.y - start.y).abs() < 5
 }
 
 /*
