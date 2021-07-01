@@ -21,7 +21,7 @@ fn main() {
         let points = generator_vec(&img, verbose);
 
         dbg!(points.len());
-        display_image(&points, img.dimensions()).unwrap();
+        display_image(&points, img.dimensions(), "final".into()).unwrap();
     }
 }
 
@@ -82,10 +82,10 @@ fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
     // for the first point use this.
     let mut direction_change = vec![
         RIGHT,
-        RIGHT_BOTTOM,
         RIGHT_TOP,
-        BOTTOM,
         TOP,
+        RIGHT_BOTTOM,
+        BOTTOM,
         LEFT_BOTTOM,
         LEFT_TOP,
         LEFT,
@@ -105,9 +105,10 @@ fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
     dbg!(&first_spot);
     let mut current_spot = first_spot.expect("No non-white pixels located");
     let first_spot = first_spot.unwrap();
-
+    let mut run = 0;
     return_points.push(current_spot);
     'main_loop: loop {
+        run += 1;
         let mut next = None;
         if verbose > 1 {
             dbg!(return_points.len());
@@ -164,21 +165,38 @@ fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
                 }
             }
         }
-
+        if false && (run > 4400 && run < 4650) {
+            //if run % 100 == 0 {
+            display_image(&&return_points, img.dimensions(), format!("{}", run)).unwrap();
+        }
         let last_two = return_points.iter().rev().take(2).collect::<Vec<_>>();
-        direction_change = next_directions(
-            last_two.get(0).unwrap(),
-            last_two.get(1).unwrap(),
-            pixel_movement,
-        )
+        direction_change = if last_two.len() == 2 {
+            next_directions(
+                last_two.get(0).unwrap(),
+                last_two.get(1).unwrap(),
+                pixel_movement,
+            )
+        } else {
+            vec![
+                RIGHT,
+                RIGHT_BOTTOM,
+                RIGHT_TOP,
+                BOTTOM,
+                TOP,
+                LEFT_BOTTOM,
+                LEFT_TOP,
+                LEFT,
+            ]
+        };
     }
     return_points
 }
 
 fn next_directions(from: &Point, to: &Point, pixel_movement: i32) -> Vec<Point> {
-    let x = (from.x - to.x) / pixel_movement;
-    let y = (from.y - to.y) / pixel_movement;
+    let x = (to.x - from.x) / pixel_movement;
+    let y = (to.y - from.y) / pixel_movement;
     let point = Point { x: x, y: y };
+    //dbg!(from, to, &point);
     match point {
         RIGHT => {
             vec![
@@ -189,13 +207,32 @@ fn next_directions(from: &Point, to: &Point, pixel_movement: i32) -> Vec<Point> 
                 BOTTOM,
                 LEFT_TOP,
                 LEFT_BOTTOM,
+                LEFT,
             ]
         }
         RIGHT_TOP => {
-            vec![RIGHT_TOP, TOP, RIGHT, LEFT_TOP, RIGHT_BOTTOM, BOTTOM]
+            vec![
+                RIGHT_TOP,
+                RIGHT,
+                TOP,
+                RIGHT_BOTTOM,
+                LEFT_TOP,
+                BOTTOM,
+                LEFT,
+                LEFT_BOTTOM,
+            ]
         }
         RIGHT_BOTTOM => {
-            vec![RIGHT_BOTTOM, RIGHT, BOTTOM, LEFT_BOTTOM, RIGHT_TOP, LEFT]
+            vec![
+                RIGHT_BOTTOM,
+                RIGHT,
+                BOTTOM,
+                RIGHT_TOP,
+                LEFT_BOTTOM,
+                LEFT,
+                TOP,
+                LEFT_TOP,
+            ]
         }
         LEFT => {
             vec![
@@ -206,34 +243,55 @@ fn next_directions(from: &Point, to: &Point, pixel_movement: i32) -> Vec<Point> 
                 BOTTOM,
                 RIGHT_TOP,
                 RIGHT_BOTTOM,
+                RIGHT,
             ]
         }
         LEFT_TOP => {
-            vec![LEFT_TOP, TOP, LEFT, LEFT_BOTTOM, RIGHT_TOP, RIGHT]
+            vec![
+                LEFT_TOP,
+                TOP,
+                LEFT,
+                RIGHT_TOP,
+                LEFT_BOTTOM,
+                RIGHT,
+                BOTTOM,
+                RIGHT_BOTTOM,
+            ]
         }
         LEFT_BOTTOM => {
-            vec![LEFT_BOTTOM, BOTTOM, LEFT, LEFT_TOP, RIGHT_BOTTOM, RIGHT]
+            vec![
+                LEFT_BOTTOM,
+                BOTTOM,
+                LEFT,
+                LEFT_TOP,
+                RIGHT_BOTTOM,
+                RIGHT,
+                TOP,
+                RIGHT_TOP,
+            ]
         }
         TOP => {
             vec![
                 TOP,
-                LEFT_TOP,
                 RIGHT_TOP,
+                LEFT_TOP,
                 LEFT,
                 RIGHT,
                 LEFT_BOTTOM,
                 RIGHT_BOTTOM,
+                BOTTOM,
             ]
         }
         BOTTOM => {
             vec![
                 BOTTOM,
-                RIGHT_BOTTOM,
                 LEFT_BOTTOM,
+                RIGHT_BOTTOM,
                 LEFT,
                 RIGHT,
                 LEFT_TOP,
                 RIGHT_TOP,
+                TOP,
             ]
         }
         _ => vec![],
@@ -291,8 +349,13 @@ fn argument_parse() -> clap::ArgMatches {
         .get_matches()
 }
 
-fn display_image(points: &Vec<Point>, size: (u32, u32)) -> Result<(), Box<dyn std::error::Error>> {
-    let root = BitMapBackend::new(OUT_FILE_NAME, size).into_drawing_area();
+fn display_image(
+    points: &Vec<Point>,
+    size: (u32, u32),
+    file_apend: String,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let out_file = format!("plotters-doc-data/snowflake_{}.png", file_apend);
+    let root = BitMapBackend::new(&out_file, size).into_drawing_area();
 
     root.fill(&WHITE)?;
 
@@ -312,6 +375,6 @@ fn display_image(points: &Vec<Point>, size: (u32, u32)) -> Result<(), Box<dyn st
 
     // To avoid the IO failure being ignored silently, we manually call the present function
     root.present().expect("Unable to write result to file, please make sure 'plotters-doc-data' dir exists under current dir");
-    println!("Result has been saved to {}", OUT_FILE_NAME);
+    println!("Result has been saved to {}", out_file);
     Ok(())
 }
