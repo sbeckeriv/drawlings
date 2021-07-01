@@ -110,7 +110,7 @@ fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
     'main_loop: loop {
         run += 1;
         let mut next = None;
-        if verbose > 1 {
+        if verbose == 1 {
             dbg!(return_points.len());
         }
         'top_loop: for direct in &direction_change {
@@ -122,7 +122,7 @@ fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
             };
 
             if return_points.contains(&point) || bad_points.contains(&point) {
-                if verbose > 1 {
+                if verbose == 1 {
                     dbg!(
                         &point,
                         (return_points.contains(&point), bad_points.contains(&point))
@@ -136,20 +136,20 @@ fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
                 next = Some(point);
                 break 'top_loop;
             } else {
-                if verbose > 1 {
+                if verbose == 1 {
                     dbg!(point, pixel);
                 }
             }
         }
         match next {
             None => {
-                if verbose > 1 {
+                if verbose == 1 {
                     dbg!(&current_spot, "before pop");
                 }
                 let bad_parent = return_points.pop().expect("No parents could not find path");
                 bad_points.push(bad_parent);
                 current_spot = return_points.pop().expect("No parents could not find path");
-                if verbose > 1 {
+                if verbose == 1 {
                     dbg!(&current_spot, "after pop");
                 }
             }
@@ -165,8 +165,7 @@ fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
                 }
             }
         }
-        if false && (run > 4400 && run < 4650) {
-            //if run % 100 == 0 {
+        if verbose == 4 && run % 100 == 0 {
             display_image(&&return_points, img.dimensions(), format!("{}", run)).unwrap();
         }
         let last_two = return_points.iter().rev().take(2).collect::<Vec<_>>();
@@ -354,7 +353,7 @@ fn display_image(
     size: (u32, u32),
     file_apend: String,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let out_file = format!("plotters-doc-data/snowflake_{}.png", file_apend);
+    let out_file = format!("plotters-doc-data/{}.png", file_apend);
     let root = BitMapBackend::new(&out_file, size).into_drawing_area();
 
     root.fill(&WHITE)?;
