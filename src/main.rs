@@ -9,7 +9,7 @@ mod plotting;
 mod point;
 mod tracing;
 use disk::make_disks;
-use plotting::{display_image, save_image};
+use plotting::save_image;
 use point::Point;
 use tracing::generator_vec;
 fn main() {
@@ -31,7 +31,7 @@ fn main() {
             dbg!(&points);
         }
         if verbose == 4 {
-            display_image(&points, img.dimensions(), "plotters-doc-data/final.png").unwrap();
+            save_image(&points, img.dimensions(), "plotters-doc-data/final.png").unwrap();
         }
 
         let (img_x, img_y) = img.dimensions();
@@ -50,7 +50,15 @@ fn main() {
     if matches.subcommand_matches("debug_image").is_some() {
         let toml = fs::read_to_string(input).expect("Unable to read file");
         let points_file: PointsFile = toml::from_str(&toml).unwrap();
-        save_image(&points_file.points, &points_file.dimensions, output).unwrap();
+        save_image(
+            &points_file.points,
+            (
+                points_file.dimensions.x as u32,
+                points_file.dimensions.y as u32,
+            ),
+            output,
+        )
+        .unwrap();
     }
 
     if matches.subcommand_matches("disk_images").is_some() {

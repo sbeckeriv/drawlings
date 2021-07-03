@@ -1,4 +1,4 @@
-use crate::plotting::display_image;
+use crate::plotting::save_image;
 use crate::point::Point;
 use image::{DynamicImage, GenericImageView};
 // Ideas:
@@ -13,8 +13,8 @@ use image::{DynamicImage, GenericImageView};
 //
 //process line in both directions why not. once that is figured out..sort lines in two directions
 //from two spots using threads.
-//
-//
+
+// every direction around a point
 const RIGHT: Point = Point { x: 1, y: 0 };
 const RIGHT_TOP: Point = Point { x: 1, y: 1 };
 const RIGHT_BOTTOM: Point = Point { x: 1, y: -1 };
@@ -27,13 +27,16 @@ const TOP: Point = Point { x: 0, y: 1 };
 const BOTTOM: Point = Point { x: 0, y: -1 };
 
 const WHITE_PIXEL: image::Rgba<u8> = image::Rgba([255, 255, 255, 255]);
+const BLACK_PIXEL: image::Rgba<u8> = image::Rgba([0, 0, 0, 255]);
 
 // get the list of points along the line.
 pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
     // i think i want to create a velocity for better tracking of which way to go..
 
-    // allow the points to be this many pixels away.
+    // allow the points to be this many pixels away. 1 keeps it simple but more could make sense.
+    // I like removing points on the output of the disk images to keep this math simpler.
     let pixel_movement = 1;
+    // Do not visit these again
     let mut bad_points = vec![];
 
     let mut return_points = vec![];
@@ -59,6 +62,7 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
     let first_spot = first_spot.unwrap();
     let mut run = 0;
     return_points.push(current_spot);
+
     'main_loop: loop {
         run += 1;
         let mut next = None;
@@ -91,11 +95,13 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
                 dbg!(point, pixel);
             }
         }
+
         match next {
             None => {
                 if verbose == 1 {
                     dbg!(&current_spot, "before pop");
                 }
+                // roll back the path if we couldnt go around this point.
                 let bad_parent = return_points.pop().expect("No parents could not find path");
                 bad_points.push(bad_parent);
                 current_spot = return_points.pop().expect("No parents could not find path");
@@ -115,9 +121,11 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
                 }
             }
         }
+
         if verbose == 4 && run % 100 == 0 {
-            display_image(&return_points, img.dimensions(), &format!("{}.png", run)).unwrap();
+            save_image(&return_points, img.dimensions(), &format!("{}.png", run)).unwrap();
         }
+        // Use the last two points to get the preferred next direction.
         let last_two = return_points.iter().rev().take(2).collect::<Vec<_>>();
         direction_change = if last_two.len() == 2 {
             next_directions(
@@ -131,7 +139,7 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
     }
     return_points
 }
-
+// Keep going in the same direction if we can.
 fn next_directions(from: &Point, to: &Point, pixel_movement: i32) -> Vec<Point> {
     let x = (to.x - from.x) / pixel_movement;
     let y = (to.y - from.y) / pixel_movement;
@@ -234,7 +242,7 @@ fn next_directions(from: &Point, to: &Point, pixel_movement: i32) -> Vec<Point> 
                 TOP,
             ]
         }
-        _ => vec![],
+        _ => None.expect("Can not get directions from this point collection"),
     }
 }
 // Just get me any first spot. I thought it would work from the center
@@ -259,6 +267,7 @@ fn first_spot(img: &DynamicImage) -> Option<Point> {
     }
     first_spot
 }
+
 // let there be some buffer if we are back to the start.
 fn at_the_start(current: &Point, start: &Point) -> bool {
     (current.x - start.x).abs() < 10 && (current.y - start.y).abs() < 5

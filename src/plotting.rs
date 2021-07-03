@@ -1,14 +1,8 @@
 use crate::point::Point;
 use plotters::prelude::*;
 
+// Save the image of points that were generated. Mostly for debugging reasons.
 pub fn save_image(
-    points: &[Point],
-    size: &Point,
-    output_file: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    display_image(points, (size.x as u32, size.y as u32), output_file)
-}
-pub fn display_image(
     points: &[Point],
     size: (u32, u32),
     out_file: &str,
