@@ -1,5 +1,5 @@
 use crate::plotting::save_image;
-use crate::point::Point;
+use crate::point::{Point};
 use image::{DynamicImage, GenericImageView};
 // Ideas:
 // Process lines not pixels. run the length of X until its white.. then process over x process each
@@ -25,6 +25,7 @@ const LEFT_BOTTOM: Point = Point { x: -1, y: -1 };
 
 const TOP: Point = Point { x: 0, y: 1 };
 const BOTTOM: Point = Point { x: 0, y: -1 };
+const CENTER: Point = Point { x: 0, y: 0 };
 
 const WHITE_PIXEL: image::Rgba<u8> = image::Rgba([255, 255, 255, 255]);
 const BLACK_PIXEL: image::Rgba<u8> = image::Rgba([0, 0, 0, 255]);
@@ -125,6 +126,7 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
         if verbose == 4 && run % 100 == 0 {
             save_image(&return_points, img.dimensions(), &format!("{}.png", run)).unwrap();
         }
+
         // Use the last two points to get the preferred next direction.
         let last_two = return_points.iter().rev().take(2).collect::<Vec<_>>();
         direction_change = if last_two.len() == 2 {
@@ -141,11 +143,29 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
 }
 // Keep going in the same direction if we can.
 fn next_directions(from: &Point, to: &Point, pixel_movement: i32) -> Vec<Point> {
-    let x = (to.x - from.x) / pixel_movement;
-    let y = (to.y - from.y) / pixel_movement;
+    let mut x = (to.x - from.x) / pixel_movement;
+    let mut y = (to.y - from.y) / pixel_movement;
+    if x > 1 || x < -1 {
+        x = 0;
+    }
+
+    if y > 1 || y < -1 {
+        y = 0;
+    }
     let point = Point { x, y };
-    //dbg!(from, to, &point);
     match point {
+        CENTER => {
+            vec![
+                RIGHT,
+                RIGHT_TOP,
+                TOP,
+                RIGHT_BOTTOM,
+                BOTTOM,
+                LEFT_BOTTOM,
+                LEFT_TOP,
+                LEFT,
+            ]
+        }
         RIGHT => {
             vec![
                 RIGHT,
@@ -242,7 +262,7 @@ fn next_directions(from: &Point, to: &Point, pixel_movement: i32) -> Vec<Point> 
                 TOP,
             ]
         }
-        _ => None.expect("Can not get directions from this point collection"),
+        _ => None.unwrap_or_else(|| panic!("Can not get directions from this point collection {:?} from:{:?} to:{:?}", point, from, to)),
     }
 }
 // Just get me any first spot. I thought it would work from the center
