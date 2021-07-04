@@ -1,5 +1,5 @@
 use crate::plotting::save_image;
-use crate::point::{Point};
+use crate::point::Point;
 use image::{DynamicImage, GenericImageView};
 // Ideas:
 // Process lines not pixels. run the length of X until its white.. then process over x process each
@@ -36,7 +36,6 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
 
     // allow the points to be this many pixels away. 1 keeps it simple but more could make sense.
     // I like removing points on the output of the disk images to keep this math simpler.
-    let pixel_movement = 1;
     // Do not visit these again
     let mut bad_points = vec![];
 
@@ -71,12 +70,7 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
             dbg!(return_points.len());
         }
         'top_loop: for direct in &direction_change {
-            let move_x = direct.x + current_spot.x;
-            let move_y = direct.y + current_spot.y;
-            let point = Point {
-                x: move_x * pixel_movement,
-                y: move_y * pixel_movement,
-            };
+            let point = *direct + current_spot;
 
             if return_points.contains(&point) || bad_points.contains(&point) {
                 if verbose == 1 {
@@ -88,7 +82,7 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
                 continue;
             }
 
-            let pixel = img.get_pixel(move_x as u32, move_y as u32);
+            let pixel = img.get_pixel(point.x as u32, point.y as u32);
             if pixel != WHITE_PIXEL {
                 next = Some(point);
                 break 'top_loop;
@@ -105,7 +99,10 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
                 // roll back the path if we couldnt go around this point.
                 let bad_parent = return_points.pop().expect("No parents could not find path");
                 bad_points.push(bad_parent);
-                current_spot = return_points.pop().expect("No parents could not find path");
+                current_spot = return_points
+                    .last()
+                    .expect("No parents could not find path")
+                    .clone();
                 if verbose == 1 {
                     dbg!(&current_spot, "after pop");
                 }
@@ -123,18 +120,14 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
             }
         }
 
-        if verbose == 4 && run % 100 == 0 {
+        if verbose == 4 && (run % 100 == 0) {
             save_image(&return_points, img.dimensions(), &format!("{}.png", run)).unwrap();
         }
 
         // Use the last two points to get the preferred next direction.
         let last_two = return_points.iter().rev().take(2).collect::<Vec<_>>();
         direction_change = if last_two.len() == 2 {
-            next_directions(
-                last_two.get(0).unwrap(),
-                last_two.get(1).unwrap(),
-                pixel_movement,
-            )
+            next_directions(last_two.get(0).unwrap(), last_two.get(1).unwrap())
         } else {
             default_direction.clone()
         };
@@ -142,17 +135,8 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
     return_points
 }
 // Keep going in the same direction if we can.
-fn next_directions(from: &Point, to: &Point, pixel_movement: i32) -> Vec<Point> {
-    let mut x = (to.x - from.x) / pixel_movement;
-    let mut y = (to.y - from.y) / pixel_movement;
-    if x > 1 || x < -1 {
-        x = 0;
-    }
-
-    if y > 1 || y < -1 {
-        y = 0;
-    }
-    let point = Point { x, y };
+fn next_directions(from: &Point, to: &Point) -> Vec<Point> {
+    let point = *to - *from;
     match point {
         CENTER => {
             vec![
@@ -262,9 +246,15 @@ fn next_directions(from: &Point, to: &Point, pixel_movement: i32) -> Vec<Point> 
                 TOP,
             ]
         }
-        _ => None.unwrap_or_else(|| panic!("Can not get directions from this point collection {:?} from:{:?} to:{:?}", point, from, to)),
+        _ => None.unwrap_or_else(|| {
+            panic!(
+                "Can not get directions from this point collection {:?} from:{:?} to:{:?}",
+                point, from, to
+            )
+        }),
     }
 }
+
 // Just get me any first spot. I thought it would work from the center
 // but this was easier to reason about..
 fn first_spot(img: &DynamicImage) -> Option<Point> {
@@ -290,5 +280,6 @@ fn first_spot(img: &DynamicImage) -> Option<Point> {
 
 // let there be some buffer if we are back to the start.
 fn at_the_start(current: &Point, start: &Point) -> bool {
-    (current.x - start.x).abs() < 10 && (current.y - start.y).abs() < 5
+    let point = *current - *start;
+    point.x.abs() < 10 && point.y.abs() < 5
 }
