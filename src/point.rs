@@ -30,3 +30,36 @@ impl Sub for Point {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_sub() {
+        let point = Point { x: 1, y: 1 };
+        let other_point = Point { x: -1, y: -1 };
+        let origin = Point { x: 0, y: 0 };
+        assert_eq!(origin, point - point);
+        assert_eq!(other_point, origin - point);
+        assert_eq!(point, point - origin);
+    }
+
+    #[test]
+    fn test_add() {
+        let point = Point { x: 1, y: 1 };
+        let other_point = Point { x: 2, y: 2 };
+        let origin = Point { x: 0, y: 0 };
+        assert_eq!(other_point, point + point);
+        assert_eq!(point, origin + point);
+        assert_eq!(point, point + origin);
+    }
+
+    #[test]
+    fn test_eq() {
+        let point = Point { x: 1, y: 1 };
+        let origin = Point { x: 0, y: 0 };
+        assert_eq!(true, point == point);
+        assert_eq!(false, origin == point);
+        assert_eq!(true, origin == origin);
+    }
+}

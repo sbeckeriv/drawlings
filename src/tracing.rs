@@ -260,26 +260,58 @@ fn next_directions(from: &Point, to: &Point) -> Vec<Point> {
 fn first_spot(img: &DynamicImage) -> Option<Point> {
     let (img_x, img_y) = img.dimensions();
 
-    let mut first_spot = None;
-    'top_loop: while first_spot.is_none() {
-        for move_x in 0..img_x {
-            for move_y in 0..img_y {
-                let pixel = img.get_pixel(move_x, move_y);
-                if pixel != WHITE_PIXEL {
-                    first_spot = Some(Point {
-                        x: move_x as i32,
-                        y: move_y as i32,
-                    });
-                    break 'top_loop;
-                }
+    for move_x in 0..img_x {
+        for move_y in 0..img_y {
+            let pixel = img.get_pixel(move_x, move_y);
+            if pixel != WHITE_PIXEL {
+                return Some(Point {
+                    x: move_x as i32,
+                    y: move_y as i32,
+                });
             }
         }
     }
-    first_spot
+    None
 }
 
 // let there be some buffer if we are back to the start.
 fn at_the_start(current: &Point, start: &Point) -> bool {
     let point = *current - *start;
     point.x.abs() < 10 && point.y.abs() < 5
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::*;
+    #[test]
+    fn test_first_spot() {
+        let blank = image::open("test/images/blank.png").unwrap();
+        let dot = image::open("test/images/dot.png").unwrap();
+        assert_eq!(None, first_spot(&blank));
+        assert_eq!(Some(Point { x: 0, y: 0 }), first_spot(&dot));
+    }
+
+    #[test]
+    fn test_at_the_start() {
+        let start = Point { x: 0, y: 0 };
+        let current = Point { x: 11, y: 6 };
+        assert!(!at_the_start(&current, &start));
+
+        let start = Point { x: 0, y: 0 };
+        let current = Point { x: 9, y: 6 };
+        assert!(!at_the_start(&current, &start));
+
+        let start = Point { x: 0, y: 0 };
+        let current = Point { x: 9, y: 4 };
+        assert!(at_the_start(&current, &start));
+
+        let start = Point { x: 0, y: 0 };
+        let current = Point { x: -9, y: 4 };
+        assert!(at_the_start(&current, &start));
+
+        let start = Point { x: 0, y: 0 };
+        let current = Point { x: 9, y: -4 };
+        assert!(at_the_start(&current, &start));
+    }
 }
