@@ -35,12 +35,7 @@ fn disk_image(change_list: &[i32], out_file: &str, dimension: &str) {
     let point_list = change_list
         .iter()
         .enumerate()
-        .map(|(i, current_point)| {
-            let angle = f64::from(i as i32) * section;
-            let pi_angle = (PI * 2.0 * angle) / 360.0;
-            let radius = f64::from(*current_point as i32 + 4000);
-            (radius * (pi_angle).cos(), radius * (pi_angle).sin())
-        })
+        .map(|(i, current_point)| points_to_radius(i, current_point, section))
         .collect::<Vec<_>>();
 
     let style = plotters::style::ShapeStyle {
@@ -54,6 +49,14 @@ fn disk_image(change_list: &[i32], out_file: &str, dimension: &str) {
 
     // To avoid the IO failure being ignored silently, we manually call the present function
     root.present().expect("Unable to write result to file");
+}
+
+// Rewrite Point to support floats to return a point here..
+fn points_to_radius(i: usize, current_point: &i32, section: f64) -> (f64, f64) {
+    let angle = f64::from(i as i32) * section;
+    let pi_angle = (PI * 2.0 * angle) / 360.0;
+    let radius = f64::from(*current_point + 4000);
+    (radius * (pi_angle).cos(), radius * (pi_angle).sin())
 }
 
 // Converts the points to circles.
@@ -75,4 +78,30 @@ pub fn make_disks(points: &[Point], dimensions: &Point, out_file: &str) {
         .map(|point| point.y - middle_y)
         .collect::<Vec<_>>();
     disk_image(&changes_y, out_file, "y");
+}
+
+#[cfg(test)]
+mod tests {
+    // Note this useful idiom: importing names from outer (for mod tests) scope.
+    use super::*;
+    use float_cmp::approx_eq;
+    #[test]
+    fn test_points_to_radius() {
+        let point = points_to_radius(0, &-3999, 1.0);
+        assert!(approx_eq!(f64, 1.0, point.0, ulps = 2));
+        assert!(approx_eq!(f64, 0.0, point.1, ulps = 2));
+
+        let point = points_to_radius(90, &-3999, 1.0);
+        dbg!(point);
+        assert!(approx_eq!(f64, 0.0, point.0, epsilon = 0.00000003));
+        assert!(approx_eq!(f64, 1.0, point.1, ulps = 2));
+
+        let point = points_to_radius(180, &-3999, 1.0);
+        assert!(approx_eq!(f64, -1.0, point.0, ulps = 2));
+        assert!(approx_eq!(f64, 0.0, point.1, epsilon = 0.00000003));
+
+        let point = points_to_radius(270, &-3999, 1.0);
+        assert!(approx_eq!(f64, 0.0, point.0, epsilon = 0.00000003));
+        assert!(approx_eq!(f64, -1.0, point.1, ulps = 2));
+    }
 }
