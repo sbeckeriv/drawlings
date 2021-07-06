@@ -4,9 +4,9 @@ use std::f64::consts::PI;
 
 // Does the math to turn the line of distant to the center to a circle.
 // plots them on the graph.
-fn disk_image(change_list: &[i32], out_file: &str, dimension: &str) {
+fn disk_image(change_list: &[i32], out_file: &str, dimension: &str, final_size: (u32, u32)) {
     let file = format!("{}_{}.png", out_file, dimension);
-    let root = BitMapBackend::new(&file, (5000, 5000)).into_drawing_area();
+    let root = BitMapBackend::new(&file, final_size).into_drawing_area();
 
     root.fill(&WHITE).unwrap();
     root.draw(&Circle::new(
@@ -70,14 +70,14 @@ pub fn make_disks(points: &[Point], dimensions: &Point, out_file: &str) {
         .step_by(step_by)
         .map(|point| point.x - middle_x)
         .collect::<Vec<_>>();
-    disk_image(&changes_x, out_file, "x");
+    disk_image(&changes_x, out_file, "x", (4000, 4000));
 
     let changes_y = points
         .iter()
         .step_by(step_by)
         .map(|point| point.y - middle_y)
         .collect::<Vec<_>>();
-    disk_image(&changes_y, out_file, "y");
+    disk_image(&changes_y, out_file, "y", (4000, 4000));
 }
 
 #[cfg(test)]
@@ -103,5 +103,17 @@ mod tests {
         let point = points_to_radius(270, &-3999, 1.0);
         assert!(approx_eq!(f64, 0.0, point.0, epsilon = 0.00000003));
         assert!(approx_eq!(f64, -1.0, point.1, ulps = 2));
+    }
+
+    #[test]
+    fn test_disk_image() {
+        let out_file = "test/images/disk";
+        let points = vec![
+            7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 13, 14, 14, 15, 15, 16, 15, 16,
+            16, 17, 17, 16, 17, 16, 17, 16, 17, 16, 17, 16, 17, 16, 15, 15, 14, 15, 14, 14, 13, 13,
+            12, 13, 12, 11, 11, 10, 10, 9, 9, 8, 8, 7, 7, 6, 7, 6, 6, 5, 5, 4, 5, 4, 4,
+        ];
+        // doesnt work with other circles
+        disk_image(&points, out_file, "x", (40, 40))
     }
 }

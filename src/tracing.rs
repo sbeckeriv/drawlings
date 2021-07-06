@@ -99,10 +99,9 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
                 // roll back the path if we couldnt go around this point.
                 let bad_parent = return_points.pop().expect("No parents could not find path");
                 bad_points.push(bad_parent);
-                current_spot = return_points
+                current_spot = *return_points
                     .last()
-                    .expect("No parents could not find path")
-                    .clone();
+                    .expect("No parents could not find path");
                 if verbose == 1 {
                     dbg!(&current_spot, "after pop");
                 }
@@ -112,7 +111,7 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
                 current_spot = next;
                 return_points.push(current_spot);
                 // dont check until we are far from the start
-                if return_points.len() > 100 && at_the_start(&current_spot, &first_spot)
+                if return_points.len() > 50 && at_the_start(&current_spot, &first_spot)
                     || return_points.len() > 100_000
                 {
                     break 'main_loop;
@@ -134,6 +133,7 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
     }
     return_points
 }
+
 // Keep going in the same direction if we can.
 fn next_directions(from: &Point, to: &Point) -> Vec<Point> {
     let point = *to - *from;
@@ -246,12 +246,10 @@ fn next_directions(from: &Point, to: &Point) -> Vec<Point> {
                 TOP,
             ]
         }
-        _ => None.unwrap_or_else(|| {
-            panic!(
-                "Can not get directions from this point collection {:?} from:{:?} to:{:?}",
-                point, from, to
-            )
-        }),
+        _ => panic!(
+            "Can not get directions from this point collection {:?} from:{:?} to:{:?}",
+            point, from, to
+        ),
     }
 }
 
@@ -283,13 +281,133 @@ fn at_the_start(current: &Point, start: &Point) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use image::*;
+
     #[test]
     fn test_first_spot() {
         let blank = image::open("test/images/blank.png").unwrap();
         let dot = image::open("test/images/dot.png").unwrap();
         assert_eq!(None, first_spot(&blank));
         assert_eq!(Some(Point { x: 0, y: 0 }), first_spot(&dot));
+    }
+
+    macro_rules! direction_test {
+        ($direction:ident) => {
+            #[test]
+            fn $direction() {
+                let from = Point { x: 0, y: 0 };
+                let to = super::$direction.clone();
+                let list = next_directions(&from, &to);
+                assert_eq!(*list.first().expect("should be a list"), super::$direction);
+            }
+        };
+    }
+
+    direction_test!(TOP);
+    direction_test!(RIGHT_TOP);
+    direction_test!(LEFT_TOP);
+    direction_test!(LEFT);
+    direction_test!(RIGHT);
+    direction_test!(LEFT_BOTTOM);
+    direction_test!(RIGHT_BOTTOM);
+    direction_test!(BOTTOM);
+
+    #[test]
+    #[should_panic]
+    fn test_next_direction_to_far() {
+        let from = Point { x: 0, y: 0 };
+        let to = Point { x: 0, y: 2 };
+        next_directions(&from, &to);
+    }
+
+    #[test]
+    fn test_close_broken_circle() {
+        let img = image::open("test/images/close_broken_circle.png").expect("could not open file");
+        let points = generator_vec(&img, 4);
+        assert_eq!(68, points.len())
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_broken_circle() {
+        let img = image::open("test/images/broken_circle.png").expect("could not open file");
+        generator_vec(&img, 4);
+    }
+
+    #[test]
+    fn test_full_circle() {
+        let img = image::open("test/images/full_circle.png").expect("could not open file");
+        let points = generator_vec(&img, 4);
+        let t: Vec<Point> = vec![
+            Point { x: 3, y: 7 },
+            Point { x: 4, y: 7 },
+            Point { x: 3, y: 8 },
+            Point { x: 4, y: 8 },
+            Point { x: 3, y: 9 },
+            Point { x: 4, y: 9 },
+            Point { x: 3, y: 10 },
+            Point { x: 4, y: 10 },
+            Point { x: 3, y: 11 },
+            Point { x: 4, y: 11 },
+            Point { x: 3, y: 12 },
+            Point { x: 4, y: 12 },
+            Point { x: 3, y: 13 },
+            Point { x: 4, y: 13 },
+            Point { x: 4, y: 14 },
+            Point { x: 5, y: 13 },
+            Point { x: 5, y: 14 },
+            Point { x: 6, y: 14 },
+            Point { x: 5, y: 15 },
+            Point { x: 6, y: 15 },
+            Point { x: 6, y: 16 },
+            Point { x: 7, y: 15 },
+            Point { x: 7, y: 16 },
+            Point { x: 8, y: 16 },
+            Point { x: 7, y: 17 },
+            Point { x: 8, y: 17 },
+            Point { x: 9, y: 16 },
+            Point { x: 9, y: 17 },
+            Point { x: 10, y: 16 },
+            Point { x: 10, y: 17 },
+            Point { x: 11, y: 16 },
+            Point { x: 11, y: 17 },
+            Point { x: 12, y: 16 },
+            Point { x: 12, y: 17 },
+            Point { x: 13, y: 16 },
+            Point { x: 13, y: 17 },
+            Point { x: 14, y: 16 },
+            Point { x: 13, y: 15 },
+            Point { x: 14, y: 15 },
+            Point { x: 14, y: 14 },
+            Point { x: 15, y: 15 },
+            Point { x: 15, y: 14 },
+            Point { x: 16, y: 14 },
+            Point { x: 15, y: 13 },
+            Point { x: 16, y: 13 },
+            Point { x: 16, y: 12 },
+            Point { x: 17, y: 13 },
+            Point { x: 17, y: 12 },
+            Point { x: 16, y: 11 },
+            Point { x: 17, y: 11 },
+            Point { x: 16, y: 10 },
+            Point { x: 17, y: 10 },
+            Point { x: 16, y: 9 },
+            Point { x: 17, y: 9 },
+            Point { x: 16, y: 8 },
+            Point { x: 17, y: 8 },
+            Point { x: 16, y: 7 },
+            Point { x: 17, y: 7 },
+            Point { x: 16, y: 6 },
+            Point { x: 15, y: 7 },
+            Point { x: 15, y: 6 },
+            Point { x: 14, y: 6 },
+            Point { x: 15, y: 5 },
+            Point { x: 14, y: 5 },
+            Point { x: 14, y: 4 },
+            Point { x: 13, y: 5 },
+            Point { x: 13, y: 4 },
+            Point { x: 12, y: 4 },
+        ];
+        assert_eq!(t, points);
     }
 
     #[test]

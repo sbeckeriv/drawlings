@@ -53,13 +53,4 @@ mod tests {
         assert_eq!(point, origin + point);
         assert_eq!(point, point + origin);
     }
-
-    #[test]
-    fn test_eq() {
-        let point = Point { x: 1, y: 1 };
-        let origin = Point { x: 0, y: 0 };
-        assert_eq!(true, point == point);
-        assert_eq!(false, origin == point);
-        assert_eq!(true, origin == origin);
-    }
 }
