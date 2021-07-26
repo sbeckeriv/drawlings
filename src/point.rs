@@ -3,7 +3,7 @@ use std::ops::Sub;
 
 use serde_derive::Deserialize;
 use serde_derive::Serialize;
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, Hash)]
 pub struct Point {
     pub x: i32,
     pub y: i32,

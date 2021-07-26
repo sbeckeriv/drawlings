@@ -1,6 +1,8 @@
+use std::collections::HashSet;
+
 use crate::plotting::save_image;
 use crate::point::Point;
-use image::{DynamicImage, GenericImageView};
+use image::{DynamicImage, GenericImageView, Pixel};
 // Ideas:
 // Process lines not pixels. run the length of X until its white.. then process over x process each
 // section of y taking the middle of the "line". how does this work around curves? I think this
@@ -26,9 +28,74 @@ const LEFT_BOTTOM: Point = Point { x: -1, y: -1 };
 const TOP: Point = Point { x: 0, y: 1 };
 const BOTTOM: Point = Point { x: 0, y: -1 };
 const CENTER: Point = Point { x: 0, y: 0 };
+const DEFAULT_DIRECTIONS: [Point; 8] = [
+    RIGHT,
+    RIGHT_TOP,
+    TOP,
+    RIGHT_BOTTOM,
+    BOTTOM,
+    LEFT_BOTTOM,
+    LEFT_TOP,
+    LEFT,
+];
 
 const WHITE_PIXEL: image::Rgba<u8> = image::Rgba([255, 255, 255, 255]);
 const BLACK_PIXEL: image::Rgba<u8> = image::Rgba([0, 0, 0, 255]);
+
+fn search_for_other_line(
+    point: &Point,
+    pixel: &image::Rgba<u8>,
+    img: &DynamicImage,
+    excluded_points: HashSet<Point>,
+) -> Option<Point> {
+    None
+}
+
+fn get_points_of_color(
+    point: &Point,
+    pixel: &image::Rgba<u8>,
+    img: &DynamicImage,
+) -> HashSet<Point> {
+    let mut points = HashSet::new();
+    points.insert(point.clone());
+    let mut neighbors = DEFAULT_DIRECTIONS
+        .iter()
+        .filter_map(|direction| {
+            let moved = *direction + *point;
+            if img.get_pixel(moved.x as u32, moved.y as u32) == *pixel {
+                Some(moved)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    while let Some(next_point) = neighbors.pop() {
+        for direction in DEFAULT_DIRECTIONS.iter() {
+            let moved = *direction + next_point;
+            if points.get(&next_point).is_none()
+                && img.get_pixel(moved.x as u32, moved.y as u32) == *pixel
+            {
+                neighbors.push(moved);
+            }
+        }
+        points.insert(next_point);
+    }
+    points
+}
+
+fn locate_other_edge(point: Point, pixel: image::Rgba<u8>, img: &DynamicImage) -> Option<Point> {
+    // get a hash set of all points in the current line. to exclude in our search
+    let start_line_points = get_points_of_color(&point, &pixel, &img);
+    // search from the current point in a circle pattern for another color point not in the hash
+    // set
+    //
+    let other_side_point = search_for_other_line(&point, &pixel, &img, start_line_points);
+    // take that blob and find all the black pixels that touch it. This is the other side of the
+    // line
+    // get fancy and find a "center" point
+    //
+    None
+}
 
 // get the list of points along the line.
 pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
@@ -40,19 +107,8 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
     let mut bad_points = vec![];
 
     let mut return_points = vec![];
-    // for the first point use this.
-    let default_direction = vec![
-        RIGHT,
-        RIGHT_TOP,
-        TOP,
-        RIGHT_BOTTOM,
-        BOTTOM,
-        LEFT_BOTTOM,
-        LEFT_TOP,
-        LEFT,
-    ];
 
-    let mut direction_change = default_direction.clone();
+    let mut direction_change = DEFAULT_DIRECTIONS.clone().to_vec();
 
     let first_spot = first_spot(img);
     if verbose == 1 {
@@ -62,7 +118,6 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
     let first_spot = first_spot.unwrap();
     let mut run = 0;
     return_points.push(current_spot);
-
     'main_loop: loop {
         run += 1;
         let mut next = None;
@@ -84,7 +139,11 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
 
             let pixel = img.get_pixel(point.x as u32, point.y as u32);
             if pixel != WHITE_PIXEL {
-                next = Some(point);
+                if pixel == BLACK_PIXEL {
+                    next = Some(point);
+                } else {
+                    next = locate_other_edge(point, pixel, &img);
+                }
                 break 'top_loop;
             } else if verbose == 1 {
                 dbg!(point, pixel);
@@ -102,6 +161,7 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
                 current_spot = *return_points
                     .last()
                     .expect("No parents could not find path");
+
                 if verbose == 1 {
                     dbg!(&current_spot, "after pop");
                 }
@@ -128,7 +188,7 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
         direction_change = if last_two.len() == 2 {
             next_directions(last_two.get(0).unwrap(), last_two.get(1).unwrap())
         } else {
-            default_direction.clone()
+            DEFAULT_DIRECTIONS.clone().to_vec()
         };
     }
     return_points
