@@ -31,7 +31,7 @@ fn main() {
             dbg!(&points);
         }
         if verbose == 4 {
-            save_image(&points, img.dimensions(), "plotters-doc-data/final.png").unwrap();
+            save_image(&points, img.dimensions(), "final_debug.png").unwrap();
         }
 
         let (img_x, img_y) = img.dimensions();

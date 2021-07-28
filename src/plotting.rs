@@ -27,6 +27,9 @@ pub fn save_image(
     chart.draw_series(std::iter::once(PathElement::new(point_list, style)))?;
 
     // To avoid the IO failure being ignored silently, we manually call the present function
-    root.present().expect("Unable to write result to file");
+    dbg!(out_file);
+    root.present()
+        .expect(&format!("Unable to write result to file {}", out_file));
     Ok(())
 }
+

@@ -1,9 +1,9 @@
-use std::collections::HashSet;
-
 use crate::disk::points_to_radius;
 use crate::plotting::save_image;
 use crate::point::Point;
-use image::{DynamicImage, GenericImageView, Pixel};
+use image::{DynamicImage, GenericImageView};
+use std::collections::HashSet;
+use std::iter::FromIterator;
 // Ideas:
 // Process lines not pixels. run the length of X until its white.. then process over x process each
 // section of y taking the middle of the "line". how does this work around curves? I think this
@@ -41,7 +41,10 @@ const DEFAULT_DIRECTIONS: [Point; 8] = [
 ];
 
 const WHITE_PIXEL: image::Rgba<u8> = image::Rgba([255, 255, 255, 255]);
-const BLACK_PIXEL: image::Rgba<u8> = image::Rgba([0, 0, 0, 255]);
+
+fn black_pixel(pixel: &image::Rgba<u8>) -> bool {
+    pixel[0] < 255 && pixel[0] == pixel[1] && pixel[1] == pixel[2]
+}
 
 fn search_for_other_line(
     origin_point: &Point,
@@ -83,24 +86,37 @@ fn search_for_other_line(
     next_point
 }
 
-fn get_points_of_color(
-    point: &Point,
+fn get_line_points(
+    origin_point: &Point,
     pixel: &image::Rgba<u8>,
     img: &DynamicImage,
 ) -> HashSet<Point> {
     let mut points = HashSet::new();
-    points.insert(point.clone());
-    let mut neighbors = DEFAULT_DIRECTIONS
-        .iter()
-        .filter_map(|direction| {
-            let moved = *direction + *point;
-            if img.get_pixel(moved.x as u32, moved.y as u32) == *pixel {
-                Some(moved)
-            } else {
-                None
+    let mut neighbors = vec![origin_point.clone()];
+
+    while let Some(next_point) = neighbors.pop() {
+        for direction in DEFAULT_DIRECTIONS.iter() {
+            let moved = *direction + next_point;
+            let moved_pixel = img.get_pixel(moved.x as u32, moved.y as u32);
+
+            if points.get(&next_point).is_none() && moved_pixel == *pixel {
+                neighbors.push(moved);
+            } else if black_pixel(&moved_pixel) {
+                points.insert(moved);
             }
-        })
-        .collect::<Vec<_>>();
+        }
+    }
+    points
+}
+
+fn get_points_of_color(
+    origin_point: &Point,
+    pixel: &image::Rgba<u8>,
+    img: &DynamicImage,
+) -> HashSet<Point> {
+    let mut points = HashSet::new();
+    points.insert(origin_point.clone());
+    let mut neighbors = vec![origin_point.clone()];
     while let Some(next_point) = neighbors.pop() {
         for direction in DEFAULT_DIRECTIONS.iter() {
             let moved = *direction + next_point;
@@ -121,12 +137,22 @@ fn locate_other_edge(point: Point, pixel: image::Rgba<u8>, img: &DynamicImage) -
     // search from the current point in a circle pattern for another color point not in the hash
     // set
     //
-    let other_side_point = search_for_other_line(&point, &pixel, &img, start_line_points);
-    // take that blob and find all the black pixels that touch it. This is the other side of the
-    // line
-    // get fancy and find a "center" point
+    if let Some(next_color_line_point) =
+        search_for_other_line(&point, &pixel, &img, start_line_points)
+    {
+        // take that blob and find all the black pixels that touch it. This is the other side of the line
+        let next_line_points = get_line_points(&next_color_line_point, &pixel, &img);
+        let mut next_points = Vec::from_iter(next_line_points.iter());
+        next_points.sort();
+        // get fancy and find a "center" point. Honestly i didnt confirm sort works as i want but
+        // its a basic idea.
+        next_points
+            .get(next_points.len() / 2)
+            .and_then(|point| Some(*point.to_owned()))
+    } else {
+        None
+    }
     //
-    None
 }
 
 // get the list of points along the line.
@@ -171,9 +197,12 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
 
             let pixel = img.get_pixel(point.x as u32, point.y as u32);
             if pixel != WHITE_PIXEL {
-                if pixel == BLACK_PIXEL {
+                if black_pixel(&pixel) {
                     next = Some(point);
                 } else {
+                    if verbose >= 1 {
+                        dbg!("color pixel found", &pixel);
+                    }
                     next = locate_other_edge(point, pixel, &img);
                 }
                 break 'top_loop;
