@@ -31,11 +31,11 @@ fn disk_image(change_list: &[i32], out_file: &str, dimension: &str, final_size: 
     // to get the x,y on a circle it is angle(cos for x sin for y) * radius.
     // angle is pi*2 (tau) * angle / 360
     // radius is base + the distance from the center.
-    let section = 360.0 / (change_list.len()) as f64;
+    let slices = 360.0 / (change_list.len()) as f64;
     let point_list = change_list
         .iter()
         .enumerate()
-        .map(|(i, current_point)| points_to_radius(i, current_point, section))
+        .map(|(i, current_point)| points_to_radius(i, current_point + 4000, slices))
         .collect::<Vec<_>>();
 
     let style = plotters::style::ShapeStyle {
@@ -52,10 +52,11 @@ fn disk_image(change_list: &[i32], out_file: &str, dimension: &str, final_size: 
 }
 
 // Rewrite Point to support floats to return a point here..
-fn points_to_radius(i: usize, current_point: &i32, section: f64) -> (f64, f64) {
-    let angle = f64::from(i as i32) * section;
+pub fn points_to_radius(angle: usize, current_point: i32, slices: f64) -> (f64, f64) {
+    //section is how to slice up the angle?
+    let angle = f64::from(angle as i32) * slices;
     let pi_angle = (PI * 2.0 * angle) / 360.0;
-    let radius = f64::from(*current_point + 4000);
+    let radius = f64::from(current_point);
     (radius * (pi_angle).cos(), radius * (pi_angle).sin())
 }
 
@@ -87,20 +88,20 @@ mod tests {
     use float_cmp::approx_eq;
     #[test]
     fn test_points_to_radius() {
-        let point = points_to_radius(0, &-3999, 1.0);
+        let point = points_to_radius(0, 1, 1.0);
         assert!(approx_eq!(f64, 1.0, point.0, ulps = 2));
         assert!(approx_eq!(f64, 0.0, point.1, ulps = 2));
 
-        let point = points_to_radius(90, &-3999, 1.0);
+        let point = points_to_radius(90, 1, 1.0);
         dbg!(point);
         assert!(approx_eq!(f64, 0.0, point.0, epsilon = 0.00000003));
         assert!(approx_eq!(f64, 1.0, point.1, ulps = 2));
 
-        let point = points_to_radius(180, &-3999, 1.0);
+        let point = points_to_radius(180, 1, 1.0);
         assert!(approx_eq!(f64, -1.0, point.0, ulps = 2));
         assert!(approx_eq!(f64, 0.0, point.1, epsilon = 0.00000003));
 
-        let point = points_to_radius(270, &-3999, 1.0);
+        let point = points_to_radius(270, 1, 1.0);
         assert!(approx_eq!(f64, 0.0, point.0, epsilon = 0.00000003));
         assert!(approx_eq!(f64, -1.0, point.1, ulps = 2));
     }

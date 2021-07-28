@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use crate::disk::points_to_radius;
 use crate::plotting::save_image;
 use crate::point::Point;
 use image::{DynamicImage, GenericImageView, Pixel};
@@ -43,12 +44,43 @@ const WHITE_PIXEL: image::Rgba<u8> = image::Rgba([255, 255, 255, 255]);
 const BLACK_PIXEL: image::Rgba<u8> = image::Rgba([0, 0, 0, 255]);
 
 fn search_for_other_line(
-    point: &Point,
+    origin_point: &Point,
     pixel: &image::Rgba<u8>,
     img: &DynamicImage,
     excluded_points: HashSet<Point>,
 ) -> Option<Point> {
-    None
+    let angles: Vec<usize> = (0..360).step_by(10).collect();
+    let mut next_point = None;
+    let mut distance = 5;
+    loop {
+        let mut found = angles
+            .iter()
+            .map(|angle| {
+                let point = points_to_radius(*angle, distance, 1.0);
+                Point {
+                    x: point.0 as i32,
+                    y: point.1 as i32,
+                } + *origin_point
+            })
+            .collect::<Vec<Point>>();
+        found.dedup();
+        let mut found = found.iter().filter(|point| {
+            excluded_points.get(&point).is_none()
+                && img.in_bounds(point.x as u32, point.y as u32)
+                && img.get_pixel(point.x as u32, point.y as u32) == *pixel
+        });
+        if let Some(point) = found.nth(0) {
+            next_point = Some(point.clone());
+            break;
+        } else {
+            if distance > img.dimensions().0 as i32 && distance > img.dimensions().1 as i32 {
+                break;
+            } else {
+                distance += 1;
+            }
+        }
+    }
+    next_point
 }
 
 fn get_points_of_color(
