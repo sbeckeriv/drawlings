@@ -115,7 +115,11 @@ fn get_points_of_color(
     img: &DynamicImage,
 ) -> HashSet<Point> {
     let mut points = HashSet::new();
-    let mut neighbors = vec![*origin_point];
+    let mut neighbors = vec![];
+
+    if img.get_pixel(origin_point.x as u32, origin_point.y as u32) == *pixel {
+        neighbors.push(*origin_point);
+    }
     while let Some(next_point) = neighbors.pop() {
         for direction in DEFAULT_DIRECTIONS.iter() {
             let moved = *direction + next_point;
@@ -135,7 +139,6 @@ fn locate_other_edge(point: Point, pixel: image::Rgba<u8>, img: &DynamicImage) -
     let start_line_points = get_points_of_color(&point, &pixel, img);
     // search from the current point in a circle pattern for another color point not in the hash
     // set
-    dbg!(&start_line_points);
     if let Some(next_color_line_point) =
         search_for_other_line(&point, &pixel, img, start_line_points)
     {
@@ -149,7 +152,8 @@ fn locate_other_edge(point: Point, pixel: image::Rgba<u8>, img: &DynamicImage) -
         // get fancy and find a "center" point. Honestly i didnt confirm sort works as i want but
         // its a basic idea.
         next_points
-            .get(next_points.len() / 2).map(|point| *point.to_owned())
+            .get(next_points.len() / 2)
+            .map(|point| *point.to_owned())
     } else {
         None
     }
@@ -419,6 +423,80 @@ fn at_the_start(current: &Point, start: &Point) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const RED_PIXEL: image::Rgba<u8> = image::Rgba([255, 0, 0, 255]);
+    const NOT_RED_PIXEL: image::Rgba<u8> = image::Rgba([255, 255, 0, 255]);
+
+    #[test]
+    fn test_get_points_of_color_no_match() {
+        let dot = image::open("test/images/red_dot.png").unwrap();
+        let point = Point { x: 10, y: 10 };
+        let results = get_points_of_color(&point, &NOT_RED_PIXEL, &dot);
+        dbg!(&results);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_get_points_of_color() {
+        let dot = image::open("test/images/red_dot.png").unwrap();
+        let point = Point { x: 10, y: 10 };
+
+        let mut start_line_points = HashSet::new();
+        start_line_points.insert(point);
+        start_line_points.insert(Point { x: 9, y: 9 });
+        start_line_points.insert(Point { x: 10, y: 9 });
+        start_line_points.insert(Point { x: 9, y: 10 });
+        let results = get_points_of_color(&point, &RED_PIXEL, &dot);
+        assert_eq!(start_line_points, results);
+    }
+
+    #[test]
+    fn test_no_gap_connected_line() {
+        let dot = image::open("test/images/red_dot.png").unwrap();
+        let point = Point { x: 10, y: 10 };
+        let results = get_line_points(&point, &RED_PIXEL, &dot);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_gap_connected_line() {
+        let dot = image::open("test/images/red_gap.png").unwrap();
+        let point = Point { x: 10, y: 10 };
+        let results = get_line_points(&point, &RED_PIXEL, &dot);
+        assert_eq!(results.iter().nth(0), Some(&Point { x: 8, y: 9 }));
+
+        let point = Point { x: 16, y: 10 };
+        let results = get_line_points(&point, &RED_PIXEL, &dot);
+        assert_eq!(results.iter().nth(0), Some(&Point { x: 17, y: 10 }));
+    }
+
+    #[test]
+    fn test_no_other_side_of_the_gap() {
+        let dot = image::open("test/images/red_dot.png").unwrap();
+        let point = Point { x: 10, y: 10 };
+        let mut start_line_points = HashSet::new();
+        start_line_points.insert(point);
+        start_line_points.insert(Point { x: 9, y: 9 });
+        start_line_points.insert(Point { x: 10, y: 9 });
+        start_line_points.insert(Point { x: 9, y: 10 });
+        let results = search_for_other_line(&point, &RED_PIXEL, &dot, start_line_points);
+        assert_eq!(None, results);
+    }
+
+    #[test]
+    fn test_other_side_of_the_gap() {
+        let dot = image::open("test/images/red_gap.png").unwrap();
+        let point = Point { x: 10, y: 10 };
+        let mut start_line_points = HashSet::new();
+        start_line_points.insert(point);
+        start_line_points.insert(Point { x: 9, y: 9 });
+        start_line_points.insert(Point { x: 10, y: 9 });
+        start_line_points.insert(Point { x: 9, y: 10 });
+        let results = search_for_other_line(&point, &RED_PIXEL, &dot, start_line_points);
+        assert!(results.is_some());
+        // there are 3 points on the line.. we could test them all?
+        assert!(results.unwrap() > point);
+    }
 
     #[test]
     fn test_first_spot() {
