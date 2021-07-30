@@ -29,7 +29,7 @@ pub fn save_image(
     // To avoid the IO failure being ignored silently, we manually call the present function
     dbg!(out_file);
     root.present()
-        .expect(&format!("Unable to write result to file {}", out_file));
+        .unwrap_or_else(|_| panic!("Unable to write result to file {}", out_file));
     Ok(())
 }
 

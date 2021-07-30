@@ -54,7 +54,7 @@ fn search_for_other_line(
 ) -> Option<Point> {
     let angles: Vec<usize> = (0..360).step_by(10).collect();
     let mut next_point = None;
-    let mut distance = 5;
+    let mut distance = 2;
     loop {
         let mut found = angles
             .iter()
@@ -68,19 +68,17 @@ fn search_for_other_line(
             .collect::<Vec<Point>>();
         found.dedup();
         let mut found = found.iter().filter(|point| {
-            excluded_points.get(&point).is_none()
+            excluded_points.get(point).is_none()
                 && img.in_bounds(point.x as u32, point.y as u32)
                 && img.get_pixel(point.x as u32, point.y as u32) == *pixel
         });
-        if let Some(point) = found.nth(0) {
-            next_point = Some(point.clone());
+        if let Some(point) = found.next() {
+            next_point = Some(*point);
+            break;
+        } else if distance > img.dimensions().0 as i32 && distance > img.dimensions().1 as i32 {
             break;
         } else {
-            if distance > img.dimensions().0 as i32 && distance > img.dimensions().1 as i32 {
-                break;
-            } else {
-                distance += 1;
-            }
+            distance += 1;
         }
     }
     next_point
@@ -92,19 +90,21 @@ fn get_line_points(
     img: &DynamicImage,
 ) -> HashSet<Point> {
     let mut points = HashSet::new();
-    let mut neighbors = vec![origin_point.clone()];
+    let mut seen_neighbors = HashSet::new();
+    let mut neighbors = vec![*origin_point];
 
     while let Some(next_point) = neighbors.pop() {
         for direction in DEFAULT_DIRECTIONS.iter() {
             let moved = *direction + next_point;
             let moved_pixel = img.get_pixel(moved.x as u32, moved.y as u32);
 
-            if points.get(&next_point).is_none() && moved_pixel == *pixel {
+            if seen_neighbors.get(&next_point).is_none() && moved_pixel == *pixel {
                 neighbors.push(moved);
             } else if black_pixel(&moved_pixel) {
                 points.insert(moved);
             }
         }
+        seen_neighbors.insert(next_point);
     }
     points
 }
@@ -115,8 +115,7 @@ fn get_points_of_color(
     img: &DynamicImage,
 ) -> HashSet<Point> {
     let mut points = HashSet::new();
-    points.insert(origin_point.clone());
-    let mut neighbors = vec![origin_point.clone()];
+    let mut neighbors = vec![*origin_point];
     while let Some(next_point) = neighbors.pop() {
         for direction in DEFAULT_DIRECTIONS.iter() {
             let moved = *direction + next_point;
@@ -133,22 +132,24 @@ fn get_points_of_color(
 
 fn locate_other_edge(point: Point, pixel: image::Rgba<u8>, img: &DynamicImage) -> Option<Point> {
     // get a hash set of all points in the current line. to exclude in our search
-    let start_line_points = get_points_of_color(&point, &pixel, &img);
+    let start_line_points = get_points_of_color(&point, &pixel, img);
     // search from the current point in a circle pattern for another color point not in the hash
     // set
-    //
+    dbg!(&start_line_points);
     if let Some(next_color_line_point) =
-        search_for_other_line(&point, &pixel, &img, start_line_points)
+        search_for_other_line(&point, &pixel, img, start_line_points)
     {
+        dbg!(&next_color_line_point);
         // take that blob and find all the black pixels that touch it. This is the other side of the line
-        let next_line_points = get_line_points(&next_color_line_point, &pixel, &img);
+        let next_line_points = get_line_points(&next_color_line_point, &pixel, img);
+
+        dbg!(&next_line_points);
         let mut next_points = Vec::from_iter(next_line_points.iter());
         next_points.sort();
         // get fancy and find a "center" point. Honestly i didnt confirm sort works as i want but
         // its a basic idea.
         next_points
-            .get(next_points.len() / 2)
-            .and_then(|point| Some(*point.to_owned()))
+            .get(next_points.len() / 2).map(|point| *point.to_owned())
     } else {
         None
     }
@@ -167,6 +168,7 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
     let mut return_points = vec![];
 
     let mut direction_change = DEFAULT_DIRECTIONS.clone().to_vec();
+    let mut used_cross_over_colors = vec![];
 
     let first_spot = first_spot(img);
     if verbose == 1 {
@@ -182,6 +184,10 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
         if verbose == 1 {
             dbg!(return_points.len());
         }
+
+        if verbose == 1 {
+            dbg!(&current_spot, "before direct");
+        }
         'top_loop: for direct in &direction_change {
             let point = *direct + current_spot;
 
@@ -196,14 +202,20 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
             }
 
             let pixel = img.get_pixel(point.x as u32, point.y as u32);
-            if pixel != WHITE_PIXEL {
+
+            if verbose == 1 {
+                dbg!(&point, &pixel);
+            }
+            if pixel != WHITE_PIXEL && !used_cross_over_colors.contains(&pixel) {
                 if black_pixel(&pixel) {
                     next = Some(point);
                 } else {
                     if verbose >= 1 {
                         dbg!("color pixel found", &pixel);
                     }
-                    next = locate_other_edge(point, pixel, &img);
+                    next = locate_other_edge(point, pixel, img);
+                    dbg!(&next);
+                    used_cross_over_colors.push(pixel);
                 }
                 break 'top_loop;
             } else if verbose == 1 {
@@ -247,7 +259,9 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
         // Use the last two points to get the preferred next direction.
         let last_two = return_points.iter().rev().take(2).collect::<Vec<_>>();
         direction_change = if last_two.len() == 2 {
+            // keep the last direction if none. we should panic if there was no color gap
             next_directions(last_two.get(0).unwrap(), last_two.get(1).unwrap())
+                .unwrap_or(direction_change)
         } else {
             DEFAULT_DIRECTIONS.clone().to_vec()
         };
@@ -256,9 +270,9 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
 }
 
 // Keep going in the same direction if we can.
-fn next_directions(from: &Point, to: &Point) -> Vec<Point> {
+fn next_directions(from: &Point, to: &Point) -> Option<Vec<Point>> {
     let point = *to - *from;
-    match point {
+    let direction = match point {
         CENTER => {
             vec![
                 RIGHT,
@@ -367,10 +381,13 @@ fn next_directions(from: &Point, to: &Point) -> Vec<Point> {
                 TOP,
             ]
         }
-        _ => panic!(
-            "Can not get directions from this point collection {:?} from:{:?} to:{:?}",
-            point, from, to
-        ),
+        _ => vec![],
+    };
+
+    if !direction.is_empty() {
+        Some(direction)
+    } else {
+        None
     }
 }
 
@@ -417,7 +434,7 @@ mod tests {
             fn $direction() {
                 let from = Point { x: 0, y: 0 };
                 let to = super::$direction.clone();
-                let list = next_directions(&from, &to);
+                let list = next_directions(&from, &to).unwrap();
                 assert_eq!(*list.first().expect("should be a list"), super::$direction);
             }
         };
@@ -433,11 +450,10 @@ mod tests {
     direction_test!(BOTTOM);
 
     #[test]
-    #[should_panic]
     fn test_next_direction_to_far() {
         let from = Point { x: 0, y: 0 };
         let to = Point { x: 0, y: 2 };
-        next_directions(&from, &to);
+        assert_eq!(None, next_directions(&from, &to));
     }
 
     #[test]
