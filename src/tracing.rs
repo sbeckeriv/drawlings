@@ -1,7 +1,7 @@
 use crate::disk::points_to_radius;
 use crate::plotting::save_image;
 use crate::point::Point;
-use image::{DynamicImage, GenericImageView};
+use image::{DynamicImage, GenericImageView, Rgba};
 use std::collections::HashSet;
 use std::iter::FromIterator;
 // Ideas:
@@ -17,7 +17,8 @@ use std::iter::FromIterator;
 //process line in both directions why not. once that is figured out..sort lines in two directions
 //from two spots using threads.
 
-// every direction around a point
+// every direction around a point would an enum make more sense? then ever
+// direction is a different object just wrapping a point?
 const RIGHT: Point = Point { x: 1, y: 0 };
 const RIGHT_TOP: Point = Point { x: 1, y: 1 };
 const RIGHT_BOTTOM: Point = Point { x: 1, y: -1 };
@@ -40,15 +41,15 @@ const DEFAULT_DIRECTIONS: [Point; 8] = [
     LEFT,
 ];
 
-const WHITE_PIXEL: image::Rgba<u8> = image::Rgba([255, 255, 255, 255]);
+const WHITE_PIXEL: Rgba<u8> = Rgba([255, 255, 255, 255]);
 
-fn black_pixel(pixel: &image::Rgba<u8>) -> bool {
+fn black_pixel(pixel: &Rgba<u8>) -> bool {
     pixel[0] < 255 && pixel[0] == pixel[1] && pixel[1] == pixel[2]
 }
 
 fn search_for_other_line(
     origin_point: &Point,
-    pixel: &image::Rgba<u8>,
+    pixel: &Rgba<u8>,
     img: &DynamicImage,
     excluded_points: HashSet<Point>,
 ) -> Option<Point> {
@@ -72,6 +73,7 @@ fn search_for_other_line(
                 && img.in_bounds(point.x as u32, point.y as u32)
                 && img.get_pixel(point.x as u32, point.y as u32) == *pixel
         });
+
         if let Some(point) = found.next() {
             next_point = Some(*point);
             break;
@@ -84,11 +86,7 @@ fn search_for_other_line(
     next_point
 }
 
-fn get_line_points(
-    origin_point: &Point,
-    pixel: &image::Rgba<u8>,
-    img: &DynamicImage,
-) -> HashSet<Point> {
+fn get_line_points(origin_point: &Point, pixel: &Rgba<u8>, img: &DynamicImage) -> HashSet<Point> {
     let mut points = HashSet::new();
     let mut seen_neighbors = HashSet::new();
     let mut neighbors = vec![*origin_point];
@@ -111,7 +109,7 @@ fn get_line_points(
 
 fn get_points_of_color(
     origin_point: &Point,
-    pixel: &image::Rgba<u8>,
+    pixel: &Rgba<u8>,
     img: &DynamicImage,
 ) -> HashSet<Point> {
     let mut points = HashSet::new();
@@ -134,7 +132,7 @@ fn get_points_of_color(
     points
 }
 
-fn locate_other_edge(point: Point, pixel: image::Rgba<u8>, img: &DynamicImage) -> Option<Point> {
+fn locate_other_edge(point: Point, pixel: Rgba<u8>, img: &DynamicImage) -> Option<Point> {
     // get a hash set of all points in the current line. to exclude in our search
     let start_line_points = get_points_of_color(&point, &pixel, img);
     // search from the current point in a circle pattern for another color point not in the hash
@@ -142,11 +140,9 @@ fn locate_other_edge(point: Point, pixel: image::Rgba<u8>, img: &DynamicImage) -
     if let Some(next_color_line_point) =
         search_for_other_line(&point, &pixel, img, start_line_points)
     {
-        dbg!(&next_color_line_point);
         // take that blob and find all the black pixels that touch it. This is the other side of the line
         let next_line_points = get_line_points(&next_color_line_point, &pixel, img);
 
-        dbg!(&next_line_points);
         let mut next_points = Vec::from_iter(next_line_points.iter());
         next_points.sort();
         // get fancy and find a "center" point. Honestly i didnt confirm sort works as i want but
@@ -218,7 +214,6 @@ pub fn generator_vec(img: &DynamicImage, verbose: u64) -> Vec<Point> {
                         dbg!("color pixel found", &pixel);
                     }
                     next = locate_other_edge(point, pixel, img);
-                    dbg!(&next);
                     used_cross_over_colors.push(pixel);
                 }
                 break 'top_loop;
@@ -424,15 +419,14 @@ fn at_the_start(current: &Point, start: &Point) -> bool {
 mod tests {
     use super::*;
 
-    const RED_PIXEL: image::Rgba<u8> = image::Rgba([255, 0, 0, 255]);
-    const NOT_RED_PIXEL: image::Rgba<u8> = image::Rgba([255, 255, 0, 255]);
+    const RED_PIXEL: Rgba<u8> = Rgba([255, 0, 0, 255]);
+    const NOT_RED_PIXEL: Rgba<u8> = Rgba([255, 255, 0, 255]);
 
     #[test]
     fn test_get_points_of_color_no_match() {
         let dot = image::open("test/images/red_dot.png").unwrap();
         let point = Point { x: 10, y: 10 };
         let results = get_points_of_color(&point, &NOT_RED_PIXEL, &dot);
-        dbg!(&results);
         assert!(results.is_empty());
     }
 
