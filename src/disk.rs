@@ -71,14 +71,14 @@ pub fn make_disks(points: &[Point], dimensions: &Point, out_file: &str) {
         .step_by(step_by)
         .map(|point| point.x - middle_x)
         .collect::<Vec<_>>();
-    disk_image(&changes_x, out_file, "x", (4000, 4000));
+    disk_image(&changes_x, out_file, "x", (5000, 5000));
 
     let changes_y = points
         .iter()
         .step_by(step_by)
         .map(|point| point.y - middle_y)
         .collect::<Vec<_>>();
-    disk_image(&changes_y, out_file, "y", (4000, 4000));
+    disk_image(&changes_y, out_file, "y", (5000, 5000));
 }
 
 #[cfg(test)]
